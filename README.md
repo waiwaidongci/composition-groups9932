@@ -17,8 +17,8 @@ docker compose exec -T backend python -m scripts.seed_demo
 
 | 角色 | 账号 | 密码 | 典型动作 |
 |---|---|---|---|
-| admin 材料负责人 | admin@lisui.demo | Lisui2026! | 六页；创建研究、批注、提交、批准/退回补样 |
-| analyst 组成研究员 | analyst@lisui.demo | Lisui2026! | 六页；来源核对、配置δ/B、提交运行和补样说明 |
+| admin 材料负责人 | admin@lisui.demo | Lisui2026! | 六页；创建研究、批注、提交、批准/退回/撤回补样 |
+| analyst 组成研究员 | analyst@lisui.demo | Lisui2026! | 六页；来源核对、配置δ/B、提交运行和补样说明、修订/撤回本人建议 |
 | viewer 补样阅读者 | viewer@lisui.demo | Lisui2026! | 六页只读；下载获批完成研究CSV |
 
 JWT角色在后端执行，viewer写入403、analyst审批403、未获批导出403、重复审批409。登录/批注/排队/worker完成/建议与审批留审计。登录IP每分钟最多30次，另有统一错误中间件。请求校验422只返回loc/msg文本，不回显含NaN/Inf的input。部署时修改JWT_SECRET及Compose内MySQL口令。
@@ -41,6 +41,15 @@ JWT角色在后端执行，viewer写入403、analyst审批403、未获批导出4
 seed为3研究×3工艺×24样本=216行、15个成分定义。LS-01正组成，LS-02含12行零分量（每组4行），LS-03固定[50,20,15,10,5]恒定边界。固定种子290/291/292生成，五相互斥，其余相为剩余通道，仅解释相对组成。自然键email、study code、(study,sample code)、(study,component code/position)、基线run name；seed只补缺失，不覆盖用户批注/已批准建议。`SEED_DEMO=true`启动执行一次，失败记日志，也可独立重复执行。
 
 MySQL连续标量 `default_delta`、`delta` 明确 `DOUBLE(asdecimal=False)`，数值向量/SS/null通过JSON保存Python双精度，未用单精度Float列。
+
+## 补样建议的版本、撤回与并发
+
+同一组成运行可提交多份补样建议，每份建议以 `note_id` 标识版本链、`version` 从1递增；行主键 `id` 仍标识具体版本记录。修订（`POST /notes/{id}/revision`，提交人或admin）把当前版本完整保留并标记 `superseded`（原内容、批复人、批复意见与时间均不删改），另起新版本回到 `submitted` 重新审批；新版本获批前旧批复不再放行导出。撤回（`POST /notes/{id}/withdrawal`，提交人或admin，需8字以上原因）仅允许 `submitted/approved` 的最新版本，置 `withdrawn` 后立即停止该建议的导出放行，同运行其他建议的有效批复不受影响；`rejected` 不能撤回，只能修订后重新送审，已撤回建议不可再改、需要时新建建议。
+
+每行带 `lock_version` 乐观锁：审批、修订、撤回请求必须回传所读版本的 `expected_lock`，不一致统一409（“请刷新后基于最新版本操作”）；写路径在MySQL下以 `SELECT ... FOR UPDATE` 行锁把锁比较收敛到串行临界区，`(note_id,version)` 唯一约束兜底并发提交，旧标签页的审批/修订/撤回无法覆盖新版本或新批复。审阅页按版本链展示最新版本与“历次版本与批复”折叠档案，并显示当前版本锁；留痕页记录 `resample.submit/approved/rejected/revise/withdraw`。
+
+导出只认“当前最新版本仍为 `approved`”的建议：CSV 顶部以 `# 放行依据` 抬头逐份写明 NOTE 编号、版本号、状态、批复人、批复时间与意见，数据行追加 `note_id,note_version,note_status,reviewer,reviewed_at,review_note` 列，多份有效批复各输出一组数据行；撤回或被修订替代的历史批复不会出现，无有效批复时导出403。存量库执行 `migrations/002_note_versioning.sql` 回填（旧行视为各建议 v1，`note_id=id`），既有档案保持可读；`scripts/verify_note_*.py` 为无Docker的SQLite验证脚本（服务层/HTTP/并发共58项断言）。
+
 
 ## 组成几何
 

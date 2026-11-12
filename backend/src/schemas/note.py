@@ -8,3 +8,12 @@ class NoteInput(BaseModel):
 class ReviewInput(BaseModel):
     status:Literal["approved","rejected"]
     review_note:str=Field(min_length=8,max_length=1500)
+    expected_lock:int=Field(ge=0)
+class RevisionInput(BaseModel):
+    title:str=Field(min_length=2,max_length=120)
+    interpretation:str=Field(min_length=8,max_length=2000)
+    proposal:str=Field(min_length=8,max_length=2000)
+    expected_lock:int=Field(ge=0)
+class WithdrawInput(BaseModel):
+    expected_lock:int=Field(ge=0)
+    reason:str=Field(min_length=8,max_length=1500)

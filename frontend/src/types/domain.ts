@@ -7,5 +7,6 @@ export interface GroupSummary{group:string;n:number;mean_clr:number[];mean_repla
 export interface Statistics{n:number;k:number;df_between:number;df_within:number;SST:number;SSW:number;SSB:number;R2:number;F:number|null;F_status:'finite'|'unbounded'|'numerical_overflow';groups:GroupSummary[];overall_mean_clr:number[];null_R2:number[];p:number;extreme:number;resolution:number;comparison_threshold:number;tail:string}
 export interface Result{algorithm_version:string;study:Study;components:Component[];transformed:Transformed[];statistics:Statistics;delta:number;seed:number;permutations:number;zero_rows:number;input_hash:string;replacement_note:string;assumptions:string;interpretation:string}
 export interface Run{id:number;name:string;study_id:number;delta:number;permutations:number;seed:number;status:'queued'|'running'|'completed'|'failed';result:Result;error:string;owner:string;created_at:string}
-export interface Note{id:number;run_id:number;title:string;interpretation:string;proposal:string;status:'submitted'|'approved'|'rejected';owner:string;reviewer:string;review_note:string;created_at:string}
+export type NoteStatus='submitted'|'approved'|'rejected'|'superseded'|'withdrawn';
+export interface Note{id:number;note_id:number;version:number;run_id:number;title:string;interpretation:string;proposal:string;status:NoteStatus;owner:string;reviewer:string;review_note:string;reviewed_at:string;revised_by:string;revised_at:string;lock_version:number;created_at:string}
 export interface Audit{id:number;actor:string;action:string;target:string;created_at:string}
